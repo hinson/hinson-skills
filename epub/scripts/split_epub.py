@@ -12,7 +12,8 @@ from ebooklib import ITEM_DOCUMENT, ITEM_IMAGE, ITEM_STYLE, ITEM_NAVIGATION
 def split_epub(input_file, output_dir):
     """将 EPUB 的每一章保存为单独的 EPUB"""
     try:
-        book = epub.read_epub(input_file)
+        # 使用 ignore_ncx 选项避免 ebooklib 的 NCX 处理 bug
+        book = epub.read_epub(input_file, options={'ignore_ncx': True})
 
         # 获取标题作为基础名称
         titles = book.get_metadata('DC', 'title')
@@ -22,14 +23,7 @@ def split_epub(input_file, output_dir):
         # 创建输出目录
         os.makedirs(output_dir, exist_ok=True)
 
-        # 获取所有元数据
-        all_metadata = {}
-        for metadata_type in ['DC', 'OPF']:
-            for item in book.get_metadata(metadata_type, []):
-                if metadata_type not in all_metadata:
-                    all_metadata[metadata_type] = []
-                all_metadata[metadata_type].append(item)
-
+        # 简化:不需要复制所有元数据,直接复制需要的即可
         chapter_num = 0
         image_items = [item for item in book.get_items()
                       if item.get_type() == ITEM_IMAGE]
@@ -62,16 +56,6 @@ def split_epub(input_file, output_dir):
                 for author in authors:
                     chapter_book.add_author(author[0])
 
-                # 复制其他元数据
-                for metadata_type, items in all_metadata.items():
-                    for metadata_item in items:
-                        if metadata_type not in ['DC', 'creator']:
-                            chapter_book.add_metadata(
-                                metadata_type,
-                                metadata_item[0],
-                                metadata_item[1]
-                            )
-
                 # 添加当前章节
                 chapter_book.add_item(item)
 
@@ -100,10 +84,8 @@ def split_epub(input_file, output_dir):
         print(f"  保存位置: {output_dir}")
 
     except Exception as e:
-        print(f"错误: 无法分割 EPUB - {e}", file=sys.stderr)
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+        # 在库函数中抛出异常而不是调用 sys.exit
+        raise RuntimeError(f"无法分割 EPUB: {e}") from e
 
 
 def main():
@@ -120,7 +102,11 @@ def main():
         print(f"错误: 找不到文件 {input_file}", file=sys.stderr)
         sys.exit(1)
 
-    split_epub(input_file, output_dir)
+    try:
+        split_epub(input_file, output_dir)
+    except RuntimeError as e:
+        print(f"错误: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

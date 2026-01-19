@@ -1,12 +1,12 @@
 """
-测试辅助工具
+测试辅助工具函数
 
 提供创建测试 EPUB 文件和测试数据的工具函数。
+这些函数是纯函数,遵循 pytest 最佳实践。
 """
-import os
 import tempfile
-from ebooklib import epub
 from pathlib import Path
+from ebooklib import epub
 
 
 def create_simple_epub(title="测试书籍", author="测试作者", language="zh-CN",
@@ -82,7 +82,12 @@ def create_simple_epub(title="测试书籍", author="测试作者", language="zh
 
 
 def create_epub_with_images(output_path=None):
-    """创建包含图片的测试 EPUB"""
+    """
+    创建包含图片引用的测试 EPUB
+
+    注意:此函数创建引用图片的 EPUB,但实际的图片数据需要单独添加。
+    这对于测试图片提取逻辑很有用。
+    """
     book = epub.EpubBook()
     book.set_identifier('test_with_images')
     book.set_title('带图片的测试书')
@@ -117,7 +122,16 @@ def create_epub_with_images(output_path=None):
 
 
 def create_large_epub(chapter_count=50, output_path=None):
-    """创建包含多个章节的大型 EPUB,用于测试性能"""
+    """
+    创建包含多个章节的大型 EPUB,用于测试性能
+
+    参数:
+        chapter_count: 章节数量
+        output_path: 输出文件路径
+
+    返回:
+        EPUB 文件路径
+    """
     chapters = []
     for i in range(1, chapter_count + 1):
         chapters.append({
@@ -143,13 +157,16 @@ def create_large_epub(chapter_count=50, output_path=None):
 
 
 def create_malformed_epub(output_path=None):
-    """创建一个格式错误的 EPUB,用于测试错误处理"""
+    """
+    创建一个格式错误的 EPUB,用于测试错误处理
+
+    返回一个无效的 ZIP 文件(不是真正的 EPUB)。
+    """
     if output_path is None:
         output_path = tempfile.mktemp(suffix='.epub')
 
     # 创建一个无效的 ZIP 文件(不是真正的 EPUB)
-    with open(output_path, 'wb') as f:
-        f.write(b'This is not a valid EPUB file')
+    Path(output_path).write_bytes(b'This is not a valid EPUB file')
 
     return output_path
 
@@ -159,22 +176,30 @@ def setup_test_fixtures(fixture_dir):
     在指定目录创建所有测试夹具文件
 
     参数:
-        fixture_dir: 夹具目录路径
+        fixture_dir: 夹具目录路径 (Path 对象或字符串)
+
+    返回:
+        创建的文件列表
     """
     fixture_path = Path(fixture_dir)
     fixture_path.mkdir(parents=True, exist_ok=True)
 
+    created_files = []
+
     # 创建标准测试 EPUB
     simple_epub = fixture_path / 'test_book.epub'
     create_simple_epub(output_path=str(simple_epub))
+    created_files.append(simple_epub)
 
     # 创建大型测试 EPUB
     large_epub = fixture_path / 'large_book.epub'
     create_large_epub(chapter_count=30, output_path=str(large_epub))
+    created_files.append(large_epub)
 
     # 创建带图片的 EPUB
     with_images_epub = fixture_path / 'book_with_images.epub'
     create_epub_with_images(output_path=str(with_images_epub))
+    created_files.append(with_images_epub)
 
     # 创建多语言测试 EPUB
     english_epub = fixture_path / 'english_book.epub'
@@ -188,12 +213,15 @@ def setup_test_fixtures(fixture_dir):
         ],
         output_path=str(english_epub)
     )
+    created_files.append(english_epub)
 
     print(f"测试夹具已创建在: {fixture_dir}")
     print(f"  - test_book.epub (标准测试书)")
     print(f"  - large_book.epub (大型测试书, 30章)")
     print(f"  - book_with_images.epub (带图片)")
     print(f"  - english_book.epub (英文)")
+
+    return created_files
 
 
 if __name__ == '__main__':

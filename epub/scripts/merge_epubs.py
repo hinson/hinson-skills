@@ -9,8 +9,13 @@ from ebooklib import epub
 from ebooklib import ITEM_DOCUMENT, ITEM_IMAGE, ITEM_STYLE, ITEM_NAVIGATION
 
 
-def merge_epubs(output_file, input_files):
-    """合并多个 EPUB 文件"""
+def merge_epubs(input_files, output_file):
+    """合并多个 EPUB 文件
+
+    参数:
+        input_files: 输入的 EPUB 文件路径列表
+        output_file: 输出的 EPUB 文件路径
+    """
     try:
         merged_book = epub.EpubBook()
         merged_book.set_identifier(f'merged_{os.path.basename(output_file)}')
@@ -28,7 +33,8 @@ def merge_epubs(output_file, input_files):
                 continue
 
             print(f"正在处理: {input_file}")
-            book = epub.read_epub(input_file)
+            # 使用 ignore_ncx 选项避免 ebooklib 的 NCX 处理 bug
+            book = epub.read_epub(input_file, options={'ignore_ncx': True})
 
             # 获取原书名作为章节组标题
             titles = book.get_metadata('DC', 'title')
@@ -68,8 +74,7 @@ def merge_epubs(output_file, input_files):
             print(f"  ✓ 添加了 {chapter_count} 个章节")
 
         if not all_chapters:
-            print("错误: 没有找到任何章节", file=sys.stderr)
-            sys.exit(1)
+            raise RuntimeError("没有找到任何章节")
 
         # 设置目录
         merged_book.toc = tuple(all_chapters)
@@ -88,10 +93,8 @@ def merge_epubs(output_file, input_files):
         print(f"  总章节数: {len(all_chapters)}")
 
     except Exception as e:
-        print(f"错误: 无法合并 EPUB 文件 - {e}", file=sys.stderr)
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+        # 在库函数中抛出异常而不是调用 sys.exit
+        raise RuntimeError(f"无法合并 EPUB 文件: {e}") from e
 
 
 def main():
@@ -104,7 +107,13 @@ def main():
     output_file = sys.argv[1]
     input_files = sys.argv[2:]
 
-    merge_epubs(output_file, input_files)
+    try:
+        # 注意:CLI 调用时参数顺序是 output_file, input_files
+        # 但库函数签名是 merge_epubs(input_files, output_file)
+        merge_epubs(input_files, output_file)
+    except RuntimeError as e:
+        print(f"错误: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -235,7 +235,14 @@ def extract_chapters(epub_path, output_dir, output_format='txt', separate=False,
         chapter_num = 0
 
         for item in book.get_items():
+            # 跳过导航文件(nav.xhtml),只处理真正的章节内容
             if item.get_type() == ITEM_DOCUMENT:
+                file_name = item.get_name()
+
+                # 跳过导航文件
+                if file_name == 'nav.xhtml':
+                    continue
+
                 chapter_num += 1
                 content = item.get_content()
 
@@ -257,7 +264,7 @@ def extract_chapters(epub_path, output_dir, output_format='txt', separate=False,
                     'num': chapter_num,
                     'title': chapter_title,
                     'content': formatted_content,
-                    'filename': item.get_name()
+                    'filename': file_name
                 })
 
         # 输出结果

@@ -12,7 +12,8 @@ from ebooklib import ITEM_DOCUMENT, ITEM_IMAGE, ITEM_STYLE, ITEM_NAVIGATION
 def extract_metadata(epub_path):
     """提取并返回 EPUB 的元数据"""
     try:
-        book = epub.read_epub(epub_path)
+        # 使用 ignore_ncx 选项避免 ebooklib 的 NCX 处理 bug
+        book = epub.read_epub(epub_path, options={'ignore_ncx': True})
 
         metadata = {
             'file': epub_path,
@@ -75,8 +76,9 @@ def extract_metadata(epub_path):
         return metadata
 
     except Exception as e:
-        print(f"错误: 无法读取 EPUB 文件 - {e}", file=sys.stderr)
-        sys.exit(1)
+        # 在库函数中抛出异常而不是调用 sys.exit
+        # 这样测试代码可以捕获异常
+        raise RuntimeError(f"无法读取 EPUB 文件: {e}") from e
 
 
 def main():
@@ -85,7 +87,12 @@ def main():
         sys.exit(1)
 
     epub_path = sys.argv[1]
-    metadata = extract_metadata(epub_path)
+
+    try:
+        metadata = extract_metadata(epub_path)
+    except RuntimeError as e:
+        print(f"错误: {e}", file=sys.stderr)
+        sys.exit(1)
 
     # 格式化输出
     print("=" * 50)

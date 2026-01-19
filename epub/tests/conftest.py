@@ -1,80 +1,146 @@
 """
-测试配置和共享夹具
+Pytest 配置和共享 fixtures
 
 提供测试所需的共享资源、临时文件管理和测试数据。
 """
-import unittest
+import pytest
 import tempfile
 import shutil
-import os
-import sys
 from pathlib import Path
 
-# 添加脚本目录到路径
+
+# 添加脚本目录到 Python 路径
 SCRIPTS_DIR = Path(__file__).parent.parent / 'scripts'
+import sys
 sys.path.insert(0, str(SCRIPTS_DIR))
 
 
-class EPUBTestCase(unittest.TestCase):
-    """EPUB 测试基类,提供共享的测试工具"""
+@pytest.fixture
+def temp_dir():
+    """创建临时目录,测试后自动清理"""
+    temp_path = tempfile.mkdtemp()
+    yield temp_path
+    # 清理
+    if Path(temp_path).exists():
+        shutil.rmtree(temp_path)
 
-    def setUp(self):
-        """每个测试前的设置"""
-        # 创建临时目录
-        self.test_dir = tempfile.mkdtemp()
-        self.output_dir = os.path.join(self.test_dir, 'output')
-        os.makedirs(self.output_dir)
 
-        # 测试 EPUB 路径
-        self.fixture_dir = Path(__file__).parent / 'fixtures'
-        self.test_epub = self.fixture_dir / 'test_book.epub'
+@pytest.fixture
+def output_dir(temp_dir):
+    """创建输出目录,测试后自动清理"""
+    output_path = Path(temp_dir) / 'output'
+    output_path.mkdir(parents=True, exist_ok=True)
+    return str(output_path)
 
-    def tearDown(self):
-        """每个测试后的清理"""
-        # 删除临时目录
-        if os.path.exists(self.test_dir):
-            shutil.rmtree(self.test_dir)
 
-    def get_test_output_path(self, filename):
-        """获取测试输出文件路径"""
-        return os.path.join(self.output_dir, filename)
+@pytest.fixture
+def test_epub():
+    """获取测试 EPUB 文件路径"""
+    fixture_dir = Path(__file__).parent / 'fixtures'
+    epub_path = fixture_dir / 'test_book.epub'
 
-    def assertFileExists(self, path, msg=None):
-        """断言文件存在"""
-        if not os.path.exists(path):
-            if msg is None:
-                msg = f"文件不存在: {path}"
-            self.fail(msg)
+    if not epub_path.exists():
+        pytest.skip(f"测试 EPUB 文件不存在: {epub_path}")
 
-    def assertFileNotEmpty(self, path, msg=None):
-        """断言文件非空"""
-        self.assertFileExists(path)
-        if os.path.getsize(path) == 0:
+    return epub_path
+
+
+@pytest.fixture
+def fixture_dir():
+    """获取测试夹具目录"""
+    return Path(__file__).parent / 'fixtures'
+
+
+# pytest 断言辅助函数 - 通过 conftest.py 暴露到全局
+@pytest.fixture
+def file_helpers():
+    """提供文件断言辅助函数"""
+    class FileHelpers:
+        @staticmethod
+        def assert_exists(path, msg=None):
+            """断言文件存在"""
+            path_obj = Path(path)
+            if not path_obj.exists():
+                if msg is None:
+                    msg = f"文件不存在: {path}"
+                pytest.fail(msg)
+
+        @staticmethod
+        def assert_not_empty(path, msg=None):
+            """断言文件非空"""
+            FileHelpers.assert_exists(path)
+            if path_obj := Path(path):
+                if path_obj.stat().st_size == 0:
+                    if msg is None:
+                        msg = f"文件为空: {path}"
+                    pytest.fail(msg)
+
+        @staticmethod
+        def assert_contains(path, text, msg=None):
+            """断言文件包含指定文本"""
+            FileHelpers.assert_exists(path)
+            content = Path(path).read_text(encoding='utf-8')
+            if text not in content:
+                if msg is None:
+                    msg = f"文件 {path} 不包含文本: {text}"
+                pytest.fail(msg)
+
+    return FileHelpers
+
+
+# 便捷的全局辅助函数(可从 conftest 导入)
+def get_test_output_path(output_dir, filename):
+    """获取测试输出文件路径"""
+    return str(Path(output_dir) / filename)
+
+
+def assert_file_exists(path, msg=None):
+    """断言文件存在"""
+    path_obj = Path(path)
+    if not path_obj.exists():
+        if msg is None:
+            msg = f"文件不存在: {path}"
+        pytest.fail(msg)
+
+
+def assert_file_not_empty(path, msg=None):
+    """断言文件非空"""
+    assert_file_exists(path)
+    if path_obj := Path(path):
+        if path_obj.stat().st_size == 0:
             if msg is None:
                 msg = f"文件为空: {path}"
-            self.fail(msg)
-
-    def assertFileContains(self, path, text, msg=None):
-        """断言文件包含指定文本"""
-        self.assertFileExists(path)
-        with open(path, 'r', encoding='utf-8') as f:
-            content = f.read()
-        if text not in content:
-            if msg is None:
-                msg = f"文件 {path} 不包含文本: {text}"
-            self.fail(msg)
-
-    def count_files_in_dir(self, directory):
-        """计算目录中的文件数量"""
-        return len([f for f in os.listdir(directory)
-                   if os.path.isfile(os.path.join(directory, f))])
+            pytest.fail(msg)
 
 
-def skipIfNoTestEPUB(func):
-    """如果没有测试 EPUB 文件则跳过测试"""
-    def wrapper(self, *args, **kwargs):
-        test_epub = Path(__file__).parent / 'fixtures' / 'test_book.epub'
-        if not test_epub.exists():
-            self.skipTest(f"测试 EPUB 文件不存在: {test_epub}")
-        return func(self, *args, **kwargs)
-    return wrapper
+def assert_file_contains(path, text, msg=None):
+    """断言文件包含指定文本"""
+    assert_file_exists(path)
+    content = Path(path).read_text(encoding='utf-8')
+    if text not in content:
+        if msg is None:
+            msg = f"文件 {path} 不包含文本: {text}"
+        pytest.fail(msg)
+
+
+def count_files_in_dir(directory):
+    """计算目录中的文件数量"""
+    dir_path = Path(directory)
+    return len([f for f in dir_path.iterdir() if f.is_file()])
+
+
+# pytest 配置钩子
+def pytest_configure(config):
+    """在 pytest 启动时配置自定义标记"""
+    config.addinivalue_line(
+        "markers", "slow: 标记运行较慢的测试"
+    )
+    config.addinivalue_line(
+        "markers", "integration: 集成测试"
+    )
+    config.addinivalue_line(
+        "markers", "performance: 性能测试"
+    )
+    config.addinivalue_line(
+        "markers", "stress: 压力测试"
+    )

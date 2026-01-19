@@ -1,102 +1,82 @@
 """
 测试 extract_metadata.py 脚本
+
+使用 pytest 风格的测试,测试元数据提取功能。
 """
-import unittest
 import sys
-import os
-from pathlib import Path
 import tempfile
+import json
+import pytest
+from pathlib import Path
+from io import StringIO
+from contextlib import redirect_stdout, redirect_stderr
 
-# 添加脚本目录到路径
-SCRIPTS_DIR = Path(__file__).parent.parent / 'scripts'
-sys.path.insert(0, str(SCRIPTS_DIR))
-
-from .conftest import EPUBTestCase, skipIfNoTestEPUB
+import extract_metadata
 from .test_helpers import create_simple_epub
 
 
-class TestExtractMetadata(EPUBTestCase):
+class TestExtractMetadata:
     """测试元数据提取功能"""
 
-    @skipIfNoTestEPUB
-    def test_extract_metadata_from_valid_epub(self):
+    def test_extract_metadata_from_valid_epub(self, test_epub):
         """测试从有效的 EPUB 文件中提取元数据"""
-        import extract_metadata
-
-        metadata = extract_metadata.extract_metadata(str(self.test_epub))
+        metadata = extract_metadata.extract_metadata(str(test_epub))
 
         # 验证必需字段存在
-        self.assertIsNotNone(metadata)
-        self.assertIn('title', metadata)
-        self.assertIn('authors', metadata)
-        self.assertIn('language', metadata)
-        self.assertIn('file', metadata)
+        assert metadata is not None
+        assert 'title' in metadata
+        assert 'authors' in metadata
+        assert 'language' in metadata
+        assert 'file' in metadata
 
-    @skipIfNoTestEPUB
-    def test_extract_metadata_returns_correct_title(self):
+    def test_extract_metadata_returns_correct_title(self, test_epub):
         """测试正确提取书名"""
-        import extract_metadata
+        metadata = extract_metadata.extract_metadata(str(test_epub))
 
-        metadata = extract_metadata.extract_metadata(str(self.test_epub))
+        assert metadata['title'] == '测试书籍'
 
-        self.assertEqual(metadata['title'], '测试书籍')
-
-    @skipIfNoTestEPUB
-    def test_extract_metadata_returns_correct_author(self):
+    def test_extract_metadata_returns_correct_author(self, test_epub):
         """测试正确提取作者"""
-        import extract_metadata
+        metadata = extract_metadata.extract_metadata(str(test_epub))
 
-        metadata = extract_metadata.extract_metadata(str(self.test_epub))
+        assert len(metadata['authors']) == 1
+        assert metadata['authors'][0] == '测试作者'
 
-        self.assertEqual(len(metadata['authors']), 1)
-        self.assertEqual(metadata['authors'][0], '测试作者')
-
-    @skipIfNoTestEPUB
-    def test_extract_metadata_counts_chapters(self):
+    def test_extract_metadata_counts_chapters(self, test_epub):
         """测试正确统计章节数"""
-        import extract_metadata
-
-        metadata = extract_metadata.extract_metadata(str(self.test_epub))
+        metadata = extract_metadata.extract_metadata(str(test_epub))
 
         # 我们创建的测试书有章节
-        self.assertGreater(metadata['chapters_count'], 0)
+        assert metadata['chapters_count'] > 0
 
     def test_extract_metadata_handles_invalid_file(self):
         """测试处理无效的 EPUB 文件"""
-        import extract_metadata
-
         # 创建一个无效的 EPUB 文件
         invalid_epub = tempfile.mktemp(suffix='.epub')
-        with open(invalid_epub, 'w') as f:
-            f.write('Not a valid EPUB')
+        Path(invalid_epub).write_text('Not a valid EPUB')
 
-        with self.assertRaises(SystemExit):
+        # 核心函数现在抛出 RuntimeError 而不是 SystemExit
+        with pytest.raises(RuntimeError, match="无法读取 EPUB 文件"):
             extract_metadata.extract_metadata(invalid_epub)
 
-        os.unlink(invalid_epub)
+        Path(invalid_epub).unlink()
 
     def test_extract_metadata_handles_missing_file(self):
         """测试处理不存在的文件"""
-        import extract_metadata
-
-        with self.assertRaises(SystemExit):
+        # 核心函数现在抛出 RuntimeError 而不是 SystemExit
+        with pytest.raises(RuntimeError, match="无法读取 EPUB 文件"):
             extract_metadata.extract_metadata('/nonexistent/file.epub')
 
 
-class TestExtractMetadataCLI(EPUBTestCase):
+class TestExtractMetadataCLI:
     """测试 extract_metadata 命令行接口"""
 
-    @skipIfNoTestEPUB
-    def test_main_with_valid_file(self):
+    def test_main_with_valid_file(self, test_epub):
         """测试主函数处理有效文件"""
-        import extract_metadata
-        import io
-        from contextlib import redirect_stdout
-
         # 捕获输出
-        output = io.StringIO()
+        output = StringIO()
         with redirect_stdout(output):
-            sys.argv = ['extract_metadata.py', str(self.test_epub)]
+            sys.argv = ['extract_metadata.py', str(test_epub)]
             try:
                 extract_metadata.main()
             except SystemExit as e:
@@ -104,22 +84,16 @@ class TestExtractMetadataCLI(EPUBTestCase):
                     raise
 
         output_text = output.getvalue()
-        self.assertIn('书名:', output_text)
-        self.assertIn('测试书籍', output_text)
-        self.assertIn('作者:', output_text)
-        self.assertIn('章节数:', output_text)
+        assert '书名:' in output_text
+        assert '测试书籍' in output_text
+        assert '作者:' in output_text
+        assert '章节数:' in output_text
 
-    @skipIfNoTestEPUB
-    def test_main_shows_json_output(self):
+    def test_main_shows_json_output(self, test_epub):
         """测试主函数输出 JSON 格式"""
-        import extract_metadata
-        import io
-        from contextlib import redirect_stdout
-        import json
-
-        output = io.StringIO()
+        output = StringIO()
         with redirect_stdout(output):
-            sys.argv = ['extract_metadata.py', str(self.test_epub)]
+            sys.argv = ['extract_metadata.py', str(test_epub)]
             try:
                 extract_metadata.main()
             except SystemExit as e:
@@ -130,7 +104,7 @@ class TestExtractMetadataCLI(EPUBTestCase):
 
         # 验证 JSON 部分
         json_start = output_text.find('JSON 格式:')
-        self.assertGreater(json_start, 0)
+        assert json_start > 0
 
         # 尝试解析 JSON
         json_section = output_text[json_start:]
@@ -138,28 +112,20 @@ class TestExtractMetadataCLI(EPUBTestCase):
 
         try:
             data = json.loads(json_lines)
-            self.assertEqual(data['title'], '测试书籍')
-        except json.JSONDecodeError:
-            self.fail("无法解析 JSON 输出")
+            assert data['title'] == '测试书籍'
+        except json.JSONDecodeError as e:
+            pytest.fail(f"无法解析 JSON 输出: {e}")
 
     def test_main_with_no_arguments(self):
         """测试没有参数时显示帮助"""
-        import extract_metadata
-        import io
-        from contextlib import redirect_stderr
-
-        error = io.StringIO()
+        error = StringIO()
         with redirect_stderr(error):
             sys.argv = ['extract_metadata.py']
             try:
                 extract_metadata.main()
-            except SystemExit as e:
+            except SystemExit:
                 # 应该退出并显示错误
                 pass
 
         error_text = error.getvalue()
-        self.assertIn('使用方法', error_text)
-
-
-if __name__ == '__main__':
-    unittest.main()
+        assert '使用方法' in error_text
