@@ -1,0 +1,180 @@
+[project]
+name = "epub-skills"
+version = "0.1.0"
+description = "EPUB manipulation skills for Claude Code"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+
+dependencies = [
+    "ebooklib>=0.18",
+    "beautifulsoup4>=4.12",
+    "lxml>=5.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.8.0",
+    "pytest>=8.0",
+    "pytest-cov>=6.0",
+    "pytest-html>=4.0",
+    "pytest-xdist>=3.0",
+]
+
+[tool.ruff]
+# Python 版本目标
+target-version = "py310"
+
+# 代码行长度限制
+line-length = 100
+
+# 要检查的文件
+include = ["*.py", "*.pyi"]
+
+# 排除的目录
+extend-exclude = [
+    ".venv",
+    "__pycache__",
+    "*.egg-info",
+    ".git",
+    ".tox",
+    ".mypy_cache",
+    ".pytest_cache",
+    "build",
+    "dist",
+]
+
+[tool.ruff.lint]
+# 启用的规则集
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort (import 排序)
+    "N",      # pep8-naming
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "SIM",    # flake8-simplify
+    "RUF",    # Ruff 特定规则
+]
+
+# 忽略的规则
+ignore = [
+    "E501",   # 行长度由 formatter 处理
+    "B008",   # 函数调用作为默认参数
+    "C901",   # 复杂函数
+]
+
+# 每个文件允许的未使用导入
+unfixable = ["F401"]
+
+[tool.ruff.lint.isort]
+# Import 排序配置
+force-single-line = false
+lines-after-imports = 2
+
+[tool.ruff.lint.per-file-ignores]
+# 测试文件的特殊规则
+"tests/**/*.py" = ["S101"]  # 允许 assert
+"__init__.py" = ["F401"]    # 允许未使用的导入
+
+[tool.ruff.format]
+# 格式化配置
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+# 文档代码格式化
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
+
+[tool.pytest.ini_options]
+# Pytest 配置
+minversion = "8.0"
+testpaths = [
+    "tests",
+]
+python_files = [
+    "test_*.py",
+    "*_test.py",
+]
+python_classes = [
+    "Test*",
+]
+python_functions = [
+    "test_*",
+]
+
+# 命令行选项
+addopts = [
+    "--strict-markers",           # 严格标记检查
+    "--strict-config",            # 严格配置
+    "--verbose",                  # 详细输出
+    "--tb=short",                 # 简短回溯
+    "--cov=scripts",              # 覆盖率检查(相对路径)
+    "--cov-report=term-missing",  # 终端显示缺失行
+    "--cov-report=html",          # HTML 覆盖率报告
+    "--cov-report=xml",           # XML 覆盖率报告
+    "--cov-fail-under=80",        # 最低覆盖率要求 80%
+    "--html=pytest_report.html",  # HTML 测试报告
+    "--self-contained-html",      # 自包含 HTML
+]
+
+# 标记定义
+markers = [
+    "unit: 单元测试",
+    "integration: 集成测试",
+    "performance: 性能测试",
+    "slow: 慢速测试",
+    "skipif: 条件跳过",
+]
+
+# 日志配置
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s [%(levelname)s] %(message)s"
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"
+
+# 覆盖率配置
+[tool.coverage.run]
+source = [
+    "scripts",
+]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+    "*/.*",
+]
+branch = true  # 分支覆盖
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+    "@abc.abstractmethod",
+    "class .*\\bProtocol\\b.*:",
+    "@typing.overload",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[dependency-groups]
+dev = [
+    "ruff",
+    "pytest",
+    "pytest-cov",
+    "pytest-html",
+    "pytest-xdist",
+]
